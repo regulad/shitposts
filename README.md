@@ -14,11 +14,7 @@ async def main():
         input_bytes = input_media.read()
 
     async with AsyncShitpostingSession() as session:
-        output_bytes = await session.edit(
-            input_bytes,
-            "video/mp4",
-            [{"name": "frame", "parameters": {"bottom": "funk"}}]
-        )
+        output_bytes = await session.edit(input_bytes, "video/mp4", frame={"bottom": "Text"})
 
     with open("output.mp4", "xb") as output_media:
         output_media.write(output_bytes)

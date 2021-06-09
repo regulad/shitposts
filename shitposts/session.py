@@ -1,73 +1,110 @@
-from typing import Iterable, List, Dict, Union, Mapping
-from json import dumps
 from functools import wraps
+from json import dumps
+from typing import Optional, List, Dict, Union, Mapping
 
-import requests
-from requests_toolbelt import MultipartEncoder
+from aiohttp import ClientSession, ClientResponse, FormData
 
 from .errors import *
-from ._endpoint import *
+
+ENDPOINT = "https://shitposts.dingus-server.regulad.xyz/v1/"
 
 
-def process_resp(resp: requests.Response) -> None:
+def process_resp(resp: ClientResponse) -> None:
     if resp.ok:
         return None
-    elif resp.status_code == 429:
-        raise RatelimitException
+    elif resp.status == 429:
+        raise RatelimitException(resp.reason)
     else:
-        raise HTTPException(resp.reason, status_code=resp.status_code)
+        raise HTTPException(resp.reason, status_code=resp.status)
 
 
-class ShitpostingSession:
-    def __init__(self, endpoint: str = ENDPOINT):
+def require_session(func):
+    @wraps(func)
+    async def wrapper(self, *args, **kwargs):
+        if self._client_session:
+            return await func(self, *args, **kwargs)
+        else:
+            raise NoInitialisedSession
+
+    return wrapper
+
+
+class AsyncShitpostingSession:
+    def __init__(self, endpoint: str = ENDPOINT, *, client_session: Optional[ClientSession] = None):
         self.endpoint = endpoint
+        self._client_session = client_session
+        self._client_session_is_passed = self._client_session is not None
 
-    def edit(
-            self,
-            input_media: bytes,
-            media_type: str,
-            edits: Iterable[Mapping[str, Union[str, Mapping[str, str]]]]
-    ) -> bytes:
+    async def __aenter__(self):
+        if not self._client_session_is_passed:
+            self._client_session = ClientSession()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if not self._client_session_is_passed:
+            await self._client_session.close()
+
+    @require_session
+    async def edit(self, input_media: bytes, media_type: str, **kwargs: Mapping[str, str]) -> bytes:
         """Edit bytes using the /edit endpoint.
 
         You must specify valid MIME type in the media_type argument.
 
         If the request is a success, the return type will be the same that was requested."""
 
-        edits_json = dumps({"edits": edits})
+        edits = []
 
-        form = MultipartEncoder(
-            {
-                "Media": ("", input_media, media_type),
-                "Edits": edits_json,
-            }
-        )
+        for kwarg, value in kwargs.items():
+            edits.append(
+                {
+                    "name": kwarg,
+                    "parameters": value,
+                }
+            )
 
-        with requests.post(f"{self.endpoint}edit", data=form, headers={"Content-Type": form.content_type}) as resp:
+        edit_dict = {"edits": edits}
+
+        form = FormData()
+
+        form.add_field("Media", input_media, content_type=media_type)
+        form.add_field("Edits", dumps(edit_dict), content_type="application/json")
+
+        async with self._client_session.post(f"{self.endpoint}edit", data=form) as resp:
             process_resp(resp)
 
-            return resp.content
+            return await resp.read()
 
-    def user(self) -> dict:
+    @require_session
+    async def user(self) -> dict:
         """Retrieve user stats from the /user endpoint."""
 
-        with requests.get(f"{self.endpoint}user") as resp:
+        async with self._client_session.get(f"{self.endpoint}user") as resp:
             process_resp(resp)
 
-            return resp.json()
+            return await resp.json()
 
-    def commands(self) -> List[Dict[str, Union[str, List[Dict[str, str]]]]]:
+    @require_session
+    async def commands(self) -> List[Dict[str, Union[str, List[Dict[str, str]]]]]:
         """Get video-editing commands that the server can execute."""
 
-        with requests.get(f"{self.endpoint}commands") as resp:
+        async with self._client_session.get(f"{self.endpoint}commands") as resp:
             process_resp(resp)
 
             try:
-                return resp.json()["commands"]
+                return (await resp.json())["commands"]
             except KeyError:
                 raise UnknownResponse(resp=resp)
             except Exception:
                 raise
 
+    @require_session
+    async def get_command(self, command_name: str) -> Dict[str, Union[str, List[Dict[str, str]]]]:
+        """Get a single command from the server."""
 
-__all___ = ["ShitpostingSession"]
+        async with self._client_session.get(f"{self.endpoint}commands/{command_name}") as resp:
+            process_resp(resp)
+
+            return await resp.json()
+
+
+__all___ = ["AsyncShitpostingSession"]

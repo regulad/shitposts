@@ -1,7 +1,4 @@
-from typing import Union
-
 from aiohttp import ClientResponse
-from requests import Response
 
 
 class LibraryException(Exception):
@@ -20,6 +17,8 @@ class HTTPException(LibraryException):
     """Raised when an HTTP Error occurs."""
 
     def __init__(self, *args, status_code: int):
+        """:argument status_code The HTTP status code of the error in question."""
+
         self.status_code = status_code
 
         super().__init__(*args)
@@ -33,13 +32,11 @@ class RatelimitException(HTTPException):
 
 
 class UnknownResponse(HTTPException):
-    """Raised when getting an unknown JSON response from the API
+    """Raised when getting an unknown JSON response from the API"""
 
-    Parameters:
-        resp: The unrecognisable JSON response decoded into a dictionary.
-    """
+    def __init__(self, *args, resp: ClientResponse):
+        """:argument resp The response that could not be decoded."""
 
-    def __init__(self, *args, resp: Union[ClientResponse, Response]):
         self.resp = resp
 
         super().__init__(*args, status_code=200)
