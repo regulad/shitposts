@@ -1,6 +1,6 @@
 # shitposts
 
-Asynchronous wrapper for [ShitpostAPI](https://github.com/regulad/ShitpostAPI). 
+Asynchronous wrapper for ShitpostAPI. 
 
 ### Example
 
