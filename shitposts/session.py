@@ -6,7 +6,7 @@ from aiohttp import ClientSession, ClientResponse, FormData
 
 from .errors import *
 
-ENDPOINT = "https://shitposts.dingus-server.regulad.xyz/v1/"
+ENDPOINT = "https://shitposts.local.regulad.xyz/v1/"
 
 
 def process_resp(resp: ClientResponse) -> None:
