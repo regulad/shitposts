@@ -45,7 +45,7 @@ class AsyncShitpostingSession:
             await self._client_session.close()
 
     @require_session
-    async def edit(self, input_media: bytes, media_type: str, **kwargs: Mapping[str, str]) -> bytes:
+    async def edit(self, input_media: bytes, media_type: str, **kwargs) -> bytes:
         """Edit bytes using the /edit endpoint.
 
         You must specify valid MIME type in the media_type argument.
